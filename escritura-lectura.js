@@ -57,7 +57,37 @@ async function escribirArchivo(filename, content) {
   });
 }
 
+/**
+ *
+ * @param {string} linksPath el nombre del archivo dentro de links folder
+ * @returns
+ */
+function leerArchivoPathCompleto(linksPath) {
+  // verificar que este archivo exista
+  const content = filesystem.readFileSync(linksPath, {
+    encoding: "utf8",
+    flag: "r",
+  });
+  // si existe leerlo y retornarlo
+  return content;
+  // si no existe, no hacer nada
+}
+
+/**
+ *
+ * @param {string} filename indicar el nombre del archivo a guardar en links folder
+ * @param {Object|Array} content el contenido a escribir (o añadir) al archivo
+ */
+async function escribirArchivoPathCompleto(linksPath, content) {
+  return new Promise((resolve) => {
+    filesystem.writeFileSync(linksPath, JSON.stringify(content));
+    resolve();
+  });
+}
+
 module.exports = {
   escribirArchivo,
   leerArchivo,
+  escribirArchivoPathCompleto,
+  leerArchivoPathCompleto,
 };
