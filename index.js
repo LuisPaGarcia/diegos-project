@@ -99,5 +99,5 @@ function delay(msDelay) {
     }
   }
 
-  // await browser.close();
+  await browser.close();
 })();

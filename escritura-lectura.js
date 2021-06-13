@@ -46,7 +46,9 @@ async function escribirArchivo(filename, content) {
     if (fileExist) {
       // append (añadir el contenido)
       const contenidoDelArchivoExistente = JSON.parse(leerArchivo(filename));
-      const nuevoContenido = [...contenidoDelArchivoExistente, ...content];
+      const nuevoContenido = [
+        ...new Set([...contenidoDelArchivoExistente, ...content]),
+      ];
       filesystem.writeFileSync(linksPath, JSON.stringify(nuevoContenido));
       resolve();
     } else {
