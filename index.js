@@ -62,7 +62,7 @@ function delay(msDelay) {
   await escrituraLectura.escribirArchivo(year + "-links.json", urls);
 
   // Ciclo de click sobre la paginacion
-  const paginas = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 11, 12, 13, 14, 15];
+  const paginas = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 10, 11, 12, 13, 14, 15];
   for (const index of paginas) {
     const query =
       "#MasterGC_ContentBlockHolder_gvResultado > tbody > tr.FooterTablaDetalle > td > table > tbody > tr > td:nth-child(" +
@@ -70,7 +70,9 @@ function delay(msDelay) {
       ") > a";
 
     const linkExist = await page.evaluate(function (query) {
-      return document.querySelector(query);
+      return document.querySelector(query)
+        ? document.querySelector(query).innerText
+        : null;
     }, query);
 
     if (linkExist !== null) {
@@ -95,7 +97,7 @@ function delay(msDelay) {
       // Escribiendo sobre el file
       await escrituraLectura.escribirArchivo(year + "-links.json", urls);
 
-      console.log("Cambio de pagina");
+      console.log("click en", linkExist);
     }
   }
 

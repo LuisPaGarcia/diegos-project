@@ -10,12 +10,16 @@ const path = require("path");
  * @param {string} fileName el nombre del archivo dentro de links folder
  * @returns
  */
-function leerArchivo(fileName) {
+function leerArchivo(
+  fileName,
+  folderName = "compra-directa",
+  subfolder = "links"
+) {
   const linksPath = path.join(
     __dirname,
     "output",
-    "compra-directa",
-    "links",
+    folderName,
+    subfolder,
     fileName
   );
   // verificar que este archivo exista
@@ -33,19 +37,26 @@ function leerArchivo(fileName) {
  * @param {string} filename indicar el nombre del archivo a guardar en links folder
  * @param {Object|Array} content el contenido a escribir (o añadir) al archivo
  */
-async function escribirArchivo(filename, content) {
+async function escribirArchivo(
+  filename,
+  content,
+  folderName = "compra-directa",
+  subfolder = "links"
+) {
   return new Promise((resolve) => {
     const linksPath = path.join(
       __dirname,
       "output",
-      "compra-directa",
-      "links",
+      folderName,
+      subfolder,
       filename
     );
     const fileExist = filesystem.existsSync(linksPath);
     if (fileExist) {
       // append (añadir el contenido)
-      const contenidoDelArchivoExistente = JSON.parse(leerArchivo(filename));
+      const contenidoDelArchivoExistente = JSON.parse(
+        leerArchivo(filename, folderName, subfolder)
+      );
       const nuevoContenido = [
         ...new Set([...contenidoDelArchivoExistente, ...content]),
       ];
