@@ -1,93 +1,88 @@
 const puppeteer = require("puppeteer");
 const escrituraLectura = require("./escritura-lectura");
 
-function delay(msDelay) {
-  return new Promise(function (resolve) {
-    setTimeout(resolve, msDelay);
-  });
-}
-
 (async function () {
-  const browser = await puppeteer.launch({
-    headless: false,
-    executablePath:
-      "./node_modules/puppeteer/.local-chromium/win64-869685/chrome-win/chrome.exe",
-  });
-  const type = process.argv[2];
-  const year = process.argv[3];
-  let pageUrlsJson;
   try {
-    pageUrlsJson = require(`./output/${type}/links/${year}-links.json`);
-  } catch (error) {
-    console.error("Error: You must enter a valid year or a valid type.");
-    process.exit();
-  }
-  console.log(`- Start ${type} on ${year}`);
-
-  for (const pageUrl of pageUrlsJson) {
-    const pagesIndexFirst = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-    const pagesIndexNext = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
-    const pagesIndexArray = [
-      ...pagesIndexFirst,
-      ...Array(20).fill(pagesIndexNext).flat(),
-    ];
-    let acummuladorAEscribir = [];
+    const type = process.argv[2];
+    const year = process.argv[3];
+    const browser = await puppeteer.launch({
+      headless: false,
+      executablePath:
+        "./node_modules/puppeteer/.local-chromium/win64-869685/chrome-win/chrome.exe",
+    });
+    const url =
+      "https://www.guatecompras.gt/reportes/RptDetallePublicacionesNPG.aspx?rt=1&mod=1&ecn=97&yy=2011&te=1&ste=6";
     const page = await browser.newPage();
-    await page.goto(pageUrl);
-    const generalData = await fetchGeneralData(page);
+    await page.goto(url);
 
-    datos = await capturarTablaDatos(page, generalData);
-    acummuladorAEscribir = acummuladorAEscribir.concat(datos);
-    console.log("Page: 1");
-    // Has multiple pages
-    const dataPages = await page.evaluate(() => [
-      ...document.querySelectorAll(
-        "#MasterGC_ContentBlockHolder_gvResultado > tbody > tr.TablaPagineo > td > table > tbody > tr > td a"
-      ),
-    ]);
+    // get total pages using
+    const totalPages = await page.evaluate(() => {
+      return Math.ceil(
+        Number(
+          document
+            .querySelector("#MasterGC_ContentBlockHolder_lblCantidad")
+            .innerText.replace(",", "")
+        ) / 25
+      );
+    });
+    const generalData = getGeneralData(page);
+    let data = [];
+    // -> Get data of first page and append to data
+    let tableData = await getTableData(page, generalData);
+    data = data.concat(tableData);
 
-    if (dataPages.length > 0) {
-      let index = 0;
-      for (const pageLinkIndex of pagesIndexArray) {
-        const query = `#MasterGC_ContentBlockHolder_gvResultado > tbody > tr.TablaPagineo > td > table > tbody > tr > td:nth-child(${pageLinkIndex}) > a`;
-        const elementExist = await page.evaluate(function (query) {
-          const element = document.querySelector(query)
-            ? document.querySelector(query).innerText
-            : null;
-          return element;
-        }, query);
+    console.log("Get data from page 1");
+    // console.log("Save on file data from page 1");
+    console.log("data size:", data.length);
 
-        if (elementExist) {
-          console.log("Page:", elementExist);
-          await page.click(query);
-          await page.waitForSelector(
-            "#MasterGC_ContentBlockHolder_gvResultado > tbody"
-          );
-          await delay(100);
-          // leer y guardar datoss
-          datos = await capturarTablaDatos(page, generalData);
-          acummuladorAEscribir = acummuladorAEscribir.concat(datos);
-          index++;
-        } else {
-          break;
-        }
+    // If there's pagination
+    if (totalPages > 1) {
+      // default pages array
+      const pageIndexArray = Array.from(
+        // [2...totalPages]
+        { length: totalPages - 1 },
+        (_, i) => i + 2
+      );
+
+      // We start on 1, so Iterate over [2...totalPages]
+      for (const pageIndex of pageIndexArray) {
+        await page.evaluate((pageIndex) => {
+          // Mimic an anchor to click it and go to the next page
+          const anchor = document.createElement("a");
+          anchor.href = `javascript:__doPostBack('MasterGC$ContentBlockHolder$gvResultado','Page$${pageIndex}')`;
+          anchor.classList.add("next-link");
+          anchor.innerText = "next-link";
+          document
+            .querySelector("#MasterGC_ContentBlockHolder_lblTituloPrincipal")
+            .append(anchor);
+        }, pageIndex);
+
+        await Promise.all([page.click(".next-link"), page.waitForNavigation()]);
+
+        console.log("Current page:", pageIndex);
+        // -> Get data of pageIndex page and append to data
+        tableData = await getTableData(page, generalData);
+        data = data.concat(tableData);
+        // console.log("Get data from page", pageIndex);
+        console.log("data size:", data.length, "new:", tableData.length);
       }
     }
+    // -> Save data of pageIndex page on file
     await escrituraLectura.escribirArchivo(
       year + "-data.json",
-      acummuladorAEscribir,
+      data,
       type,
       "data"
     );
-    console.log(pageUrl);
-    console.log("escrito!", acummuladorAEscribir.length);
+    console.log("Save on file data from url", url);
     await page.close();
+    await browser.close();
+  } catch (error) {
+    console.log(error);
   }
-
-  await browser.close();
 })();
 
-async function fetchGeneralData(page) {
+async function getGeneralData(page) {
   const {
     fechaCreacion,
     tipoEntidadSector,
@@ -137,7 +132,7 @@ async function fetchGeneralData(page) {
   return generalData;
 }
 
-async function capturarTablaDatos(page, generalData) {
+async function getTableData(page, generalData) {
   const values = await page.evaluate((generalData) => {
     var valuesInner = [];
     document.querySelectorAll("[class^='TablaFilaMix']").forEach((row) => {
