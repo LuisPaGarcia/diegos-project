@@ -5,6 +5,7 @@ const escrituraLectura = require("./escritura-lectura");
   try {
     const type = process.argv[2];
     const year = process.argv[3];
+    // node testPageJump.js compra-directa 2011
     const browser = await puppeteer.launch({
       headless: false,
       executablePath:
@@ -15,59 +16,57 @@ const escrituraLectura = require("./escritura-lectura");
     const page = await browser.newPage();
     await page.goto(url);
 
-    // get total pages using
+    // get total of pages
     const totalPages = await page.evaluate(() => {
+      const rowsPerPage = 25;
       return Math.ceil(
         Number(
           document
             .querySelector("#MasterGC_ContentBlockHolder_lblCantidad")
             .innerText.replace(",", "")
-        ) / 25
+        ) / rowsPerPage
       );
     });
-    const generalData = getGeneralData(page);
+    // captute the general data
+    const generalData = await getGeneralData(page);
+    // capture table data from page 1
     let data = [];
-    // -> Get data of first page and append to data
     let tableData = await getTableData(page, generalData);
     data = data.concat(tableData);
-
     console.log("Get data from page 1");
-    // console.log("Save on file data from page 1");
     console.log("data size:", data.length);
 
-    // If there's pagination
+    // validate that we have more than 1 page
     if (totalPages > 1) {
-      // default pages array
-      const pageIndexArray = Array.from(
-        // [2...totalPages]
-        { length: totalPages - 1 },
-        (_, i) => i + 2
-      );
-
-      // We start on 1, so Iterate over [2...totalPages]
+      // if yes, create a list from [2,3,4...N]
+      let pageIndexArray = [];
+      for (let index = 2; index <= totalPages; index++) {
+        pageIndexArray.push(index);
+      }
+      // itearate over the list
       for (const pageIndex of pageIndexArray) {
+        // create the nextPage link (1-> 2) (8 -> 9) (N-1 -> N)
         await page.evaluate((pageIndex) => {
-          // Mimic an anchor to click it and go to the next page
           const anchor = document.createElement("a");
-          anchor.href = `javascript:__doPostBack('MasterGC$ContentBlockHolder$gvResultado','Page$${pageIndex}')`;
+          anchor.href =
+            "javascript:__doPostBack('MasterGC$ContentBlockHolder$gvResultado','Page$" +
+            pageIndex +
+            "')";
           anchor.classList.add("next-link");
-          anchor.innerText = "next-link";
+          anchor.innerText = "Diego ama el ceviche peruano";
           document
             .querySelector("#MasterGC_ContentBlockHolder_lblTituloPrincipal")
             .append(anchor);
         }, pageIndex);
-
+        // click to the nextPage link AND we will wait until the next page loads
         await Promise.all([page.click(".next-link"), page.waitForNavigation()]);
-
         console.log("Current page:", pageIndex);
-        // -> Get data of pageIndex page and append to data
-        tableData = await getTableData(page, generalData);
-        data = data.concat(tableData);
-        // console.log("Get data from page", pageIndex);
-        console.log("data size:", data.length, "new:", tableData.length);
+        const tableDataN = await getTableData(page, generalData);
+        data = data.concat(tableDataN);
+        console.log("data size:", data.length);
       }
     }
-    // -> Save data of pageIndex page on file
+    // write into the year file
     await escrituraLectura.escribirArchivo(
       year + "-data.json",
       data,
@@ -75,6 +74,7 @@ const escrituraLectura = require("./escritura-lectura");
       "data"
     );
     console.log("Save on file data from url", url);
+
     await page.close();
     await browser.close();
   } catch (error) {
@@ -91,6 +91,7 @@ async function getGeneralData(page) {
     modalidad,
     cantidadPublicacionesNpg,
     montoTotalPublicacionesNpg,
+    cantidadPublicacionesNpgNumber,
   } = await page.evaluate(() => {
     return {
       fechaCreacion:
@@ -115,6 +116,12 @@ async function getGeneralData(page) {
       cantidadPublicacionesNpg:
         document.querySelector("#MasterGC_ContentBlockHolder_lblCantidad")
           ?.innerText || "",
+      cantidadPublicacionesNpgNumber:
+        Number(
+          document
+            .querySelector("#MasterGC_ContentBlockHolder_lblCantidad")
+            ?.innerText.replace(",", "")
+        ) || "",
       montoTotalPublicacionesNpg:
         document.querySelector("#MasterGC_ContentBlockHolder_lblMontoTotal")
           ?.innerText || "",
@@ -127,6 +134,7 @@ async function getGeneralData(page) {
     "Entidad Compradora": entidadCompradora,
     Modalidad: modalidad,
     "Cantidad de Publicaciones NPG": cantidadPublicacionesNpg,
+    "Cantidad de Publicaciones NPG Numero": cantidadPublicacionesNpgNumber,
     "Monto Total de Publicaciones NPG": montoTotalPublicacionesNpg,
   };
   return generalData;
@@ -166,6 +174,13 @@ async function getTableData(page, generalData) {
           row.querySelector("td:nth-child(3) > div a")?.innerText || "",
         nombre_proveedor_url:
           row.querySelector("td:nth-child(3) > div a")?.href || "",
+        monto: row.querySelector("td:nth-child(4)")?.innerText.trim() || "",
+        montoNumero: Number(
+          row
+            .querySelector("td:nth-child(4)")
+            ?.innerText.replace(",", "")
+            .trim()
+        ),
       });
     });
     return valuesInner;
