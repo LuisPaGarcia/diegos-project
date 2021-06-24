@@ -3,79 +3,146 @@ const escrituraLectura = require("./escritura-lectura");
 
 (async function () {
   try {
+    // If we dont get type and year, throw an error
+    if (process.argv.length <= 2) {
+      throw Error(
+        "Must send type and year: casos-de-excepcion|compra-directa and valid year 2011 to 2020."
+      );
+    }
     const type = process.argv[2];
     const year = process.argv[3];
-    // node testPageJump.js compra-directa 2011
+
+    let urlArray;
+    let alreadyFetched;
+
+    try {
+      urlArray = require("./output/" + type + "/links/" + year + "-links.json");
+    } catch (error) {
+      throw Error(
+        "Must send type and year: casos-de-excepcion|compra-directa and valid year 2011 to 2020."
+      );
+    }
+
+    try {
+      alreadyFetched = require("./output/" +
+        type +
+        "/already-fetched/" +
+        year +
+        "-url.json");
+    } catch (error) {
+      alreadyFetched = [];
+    }
+
     const browser = await puppeteer.launch({
       headless: false,
       executablePath:
         "./node_modules/puppeteer/.local-chromium/win64-869685/chrome-win/chrome.exe",
     });
-    const url =
-      "https://www.guatecompras.gt/reportes/RptDetallePublicacionesNPG.aspx?rt=1&mod=1&ecn=97&yy=2011&te=1&ste=6";
-    const page = await browser.newPage();
-    await page.goto(url);
 
-    // get total of pages
-    const totalPages = await page.evaluate(() => {
-      const rowsPerPage = 25;
-      return Math.ceil(
-        Number(
-          document
-            .querySelector("#MasterGC_ContentBlockHolder_lblCantidad")
-            .innerText.replace(",", "")
-        ) / rowsPerPage
+    /* LOOP START */
+    let indice = 0;
+    for (let url of urlArray) {
+      if (alreadyFetched.includes(url)) {
+        indice = indice + 1;
+        continue;
+      }
+      indice = indice + 1;
+
+      // usted va por N/totalN
+      const indexMessage = indice + "/" + urlArray.length;
+
+      const page = await browser.newPage();
+      await page.goto(url);
+
+      // get total of pages
+      const totalPages = await page.evaluate(() => {
+        const rowsPerPage = 25;
+        return Math.ceil(
+          Number(
+            document
+              .querySelector("#MasterGC_ContentBlockHolder_lblCantidad")
+              .innerText.replace(",", "")
+          ) / rowsPerPage
+        );
+      });
+      // captute the general data
+      const generalData = await getGeneralData(page);
+      // capture table data from page 1
+      let data = [];
+      let tableData = await getTableData(page, generalData);
+      data = data.concat(tableData);
+      console.log(
+        indexMessage,
+        "Current Page:",
+        1 + "/" + totalPages,
+        "Data size:",
+        data.length
       );
-    });
-    // captute the general data
-    const generalData = await getGeneralData(page);
-    // capture table data from page 1
-    let data = [];
-    let tableData = await getTableData(page, generalData);
-    data = data.concat(tableData);
-    console.log("Get data from page 1");
-    console.log("data size:", data.length);
 
-    // validate that we have more than 1 page
-    if (totalPages > 1) {
-      // if yes, create a list from [2,3,4...N]
-      let pageIndexArray = [];
-      for (let index = 2; index <= totalPages; index++) {
-        pageIndexArray.push(index);
+      // validate that we have more than 1 page
+      if (totalPages > 1) {
+        // if yes, create a list from [2,3,4...N]
+        let pageIndexArray = [];
+        for (let index = 2; index <= totalPages; index++) {
+          pageIndexArray.push(index);
+        }
+        // [2]
+        // itearate over the list
+        for (const pageIndex of pageIndexArray) {
+          // create the nextPage link (1-> 2) (8 -> 9) (N-1 -> N)
+          await page.evaluate((pageIndex) => {
+            const anchor = document.createElement("a");
+            anchor.href =
+              "javascript:__doPostBack('MasterGC$ContentBlockHolder$gvResultado','Page$" +
+              pageIndex +
+              "')";
+            anchor.classList.add("next-link");
+            anchor.innerText = "Diego ama el ceviche peruano";
+            document
+              .querySelector("#MasterGC_ContentBlockHolder_lblTituloPrincipal")
+              .append(anchor);
+          }, pageIndex);
+          // click to the nextPage link AND we will wait until the next page loads
+          await Promise.all([
+            page.click(".next-link"),
+            page.waitForNavigation(),
+          ]);
+
+          const tableDataN = await getTableData(page, generalData);
+          data = data.concat(tableDataN);
+          console.log(
+            indexMessage,
+            "Current Page:",
+            pageIndex + "/" + totalPages,
+            "Data size:",
+            data.length
+          );
+        }
       }
-      // itearate over the list
-      for (const pageIndex of pageIndexArray) {
-        // create the nextPage link (1-> 2) (8 -> 9) (N-1 -> N)
-        await page.evaluate((pageIndex) => {
-          const anchor = document.createElement("a");
-          anchor.href =
-            "javascript:__doPostBack('MasterGC$ContentBlockHolder$gvResultado','Page$" +
-            pageIndex +
-            "')";
-          anchor.classList.add("next-link");
-          anchor.innerText = "Diego ama el ceviche peruano";
-          document
-            .querySelector("#MasterGC_ContentBlockHolder_lblTituloPrincipal")
-            .append(anchor);
-        }, pageIndex);
-        // click to the nextPage link AND we will wait until the next page loads
-        await Promise.all([page.click(".next-link"), page.waitForNavigation()]);
-        console.log("Current page:", pageIndex);
-        const tableDataN = await getTableData(page, generalData);
-        data = data.concat(tableDataN);
-        console.log("data size:", data.length);
-      }
+
+      // write into the year file
+      await escrituraLectura.escribirArchivo(
+        year + "-data.json",
+        data,
+        type,
+        "data"
+      );
+
+      // write into the alreadyFetched file
+      await escrituraLectura.escribirArchivo(
+        year + "-url.json",
+        [url],
+        type,
+        "already-fetched"
+      );
+
+      console.log(indexMessage, "Save on file", data.length, "records.");
+      console.log("");
+      await page.close();
     }
-    // write into the year file
-    await escrituraLectura.escribirArchivo(
-      year + "-data.json",
-      data,
-      type,
-      "data"
-    );
-    console.log("Save on file data from url", url);
 
-    await page.close();
+    /* END LOOP */
+
     await browser.close();
   } catch (error) {
     console.log(error);
