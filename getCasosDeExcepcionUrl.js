@@ -9,7 +9,7 @@ function delay(msDelay) {
 
 (async function () {
   const browser = await puppeteer.launch({
-    // headless: false,
+    headless: false,
     executablePath:
       "./node_modules/puppeteer/.local-chromium/win64-869685/chrome-win/chrome.exe",
   });

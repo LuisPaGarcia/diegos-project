@@ -19,6 +19,32 @@ $ node index.js 2011
 ## TODO
 
 - [x] Get `Compra Directa` links by year
-- [ ] Fetch and get all the data from the fetched `Compra directa` urls.
-- [ ] Get `Casos de Excepcion` links by year
-- [ ] Fetch and get all the data from the fetched `Casos de Excepcion` urls.
+- [x] Fetch and get all the data from the fetched `Compra directa` urls.
+- [x] Get `Casos de Excepcion` links by year
+- [x] Fetch and get all the data from the fetched `Casos de Excepcion` urls.
+
+## Scripts
+
+### getCompraDirectaUrl.js
+
+```js
+$ node getCompraDirectaUrl.js [year]
+```
+
+### getCasosDeExcepcionUrl.js
+
+```js
+$ node getCasosDeExcepcionUrl.js [year]
+```
+
+### capturaDataUsandoLinks.js
+
+```js
+$ node capturaDataUsandoLinks.js [type] [year]
+```
+
+### json2csv.js
+
+```js
+$ node json2csv.js [type] [year]
+```
