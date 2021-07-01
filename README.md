@@ -27,24 +27,32 @@ $ node index.js 2011
 
 ### getCompraDirectaUrl.js
 
-```js
+```bash
 $ node getCompraDirectaUrl.js [year]
 ```
 
 ### getCasosDeExcepcionUrl.js
 
-```js
+```bash
 $ node getCasosDeExcepcionUrl.js [year]
 ```
 
 ### capturaDataUsandoLinks.js
 
-```js
+```bash
 $ node capturaDataUsandoLinks.js [type] [year]
 ```
 
 ### json2csv.js
 
-```js
+```bash
 $ node json2csv.js [type] [year]
+```
+
+## How to run multiple times the same scripts
+
+- Using `&&` between each script execution.
+
+```bash
+$ node capturaDataUsandoLinks.js compra-directa 2011 && node capturaDataUsandoLinks.js compra-directa 2012 && node capturaDataUsandoLinks.js compra-directa 2013
 ```
