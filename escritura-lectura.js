@@ -69,8 +69,44 @@ async function escribirArchivo(
     }
   });
 }
+/**
+ *
+ * @param {string} filename indicar el nombre del archivo a guardar en links folder
+ * @param {Object|Array} content el contenido a escribir (o añadir) al archivo
+ */
+async function escribirArchivoSinEvitarRepetidos(
+  filename,
+  content,
+  folderName = "compra-directa",
+  subfolder = "links"
+) {
+  return new Promise((resolve) => {
+    const linksPath = path.join(
+      __dirname,
+      "output",
+      folderName,
+      subfolder,
+      filename
+    );
+    const fileExist = filesystem.existsSync(linksPath);
+    if (fileExist) {
+      // append (añadir el contenido)
+      const contenidoDelArchivoExistente = JSON.parse(
+        leerArchivo(filename, folderName, subfolder)
+      );
+      const nuevoContenido = [...contenidoDelArchivoExistente, ...content];
+      filesystem.writeFileSync(linksPath, JSON.stringify(nuevoContenido));
+      resolve();
+    } else {
+      // lo creamos y le escribimos
+      filesystem.writeFileSync(linksPath, JSON.stringify(content));
+      resolve();
+    }
+  });
+}
 
 module.exports = {
   escribirArchivo,
   leerArchivo,
+  escribirArchivoSinEvitarRepetidos,
 };
