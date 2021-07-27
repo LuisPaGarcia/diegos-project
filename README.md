@@ -25,10 +25,10 @@ $ node index.js 2011
 
 ## Scripts
 
-### getCompraDirectaUrl.js
+### getCompraDirectaUrls.js
 
 ```bash
-$ node getCompraDirectaUrl.js [year]
+$ node getCompraDirectaUrls.js [year]
 ```
 
 ### getCasosDeExcepcionUrl.js
