@@ -2,12 +2,12 @@ const puppeteer = require("puppeteer");
 const escrituraLectura = require("./escritura-lectura");
 
 function delay(msDelay) {
-  return new Promise(function(resolve) {
+  return new Promise(function (resolve) {
     setTimeout(resolve, msDelay);
   });
 }
 
-(async function() {
+(async function () {
   const browser = await puppeteer.launch({
     headless: false,
     executablePath:
@@ -47,34 +47,47 @@ function delay(msDelay) {
   // Esperar hasta que aparezca el selector que tiene el total de entidades
   // de este total sacamos el total de páginas
   await page.waitForSelector("#MasterGC_ContentBlockHolder_lblFilas");
+  /* Proceso de normalizacion de datos o bien, arregla cagada */
+  let pageIndexArrayArreglaCagada = [11, 3, 1];
+  for (const pageIndex of pageIndexArrayArreglaCagada) {
+    await arreglaCagada(page, pageIndex);
+  }
+  console.log("Arregla cagada finalizado!");
+  /* Fin Proceso de normalizacion de datos o bien, arregla cagada */
 
-  const totalPages = await page.evaluate(function() {
-    const municipiosPorPagina = 25;
+  const totalPages = await page.evaluate(function () {
+    const entidadesPorPagina = 25;
     const totalEntidades = document.querySelector(
       "#MasterGC_ContentBlockHolder_lblFilas"
-    ).innerText;
+    );
 
     // Transform `1 al 25 de 335 Entidades consultadas` a `335`
     return Math.ceil(
-      Number(totalEntidades.split("de")[1].split("Entida")[0].trim()) /
-        municipiosPorPagina
+      Number(totalEntidades.innerText.split(" ")[4]) / entidadesPorPagina
     );
   });
-  let ulrsAccum = [];
-  const urls = await page.evaluate(function() {
+
+  /* Acumulador de URLs de todas las páginas */
+  let urlsAccum = [];
+
+  /* Capturamos todos los datos de la primer página */
+  const urls = await page.evaluate(function () {
     let listOfUrls = [
       ...document.querySelectorAll(
         "#MasterGC_ContentBlockHolder_gvResultado > tbody .FilaTablaDetalle td:nth-child(2) a"
       ),
     ];
 
-    let listOfHrefs = listOfUrls.map(function(anchor) {
+    let listOfHrefs = listOfUrls.map(function (anchor) {
       return anchor.href;
     });
 
     return listOfHrefs;
   });
-  ulrsAccum = [ ...urls ];
+
+  /* Añadimos a un array vacio las urls capturadas */
+  urlsAccum = [...urlsAccum, ...urls];
+
   // Escribiendo sobre el file
   console.log(
     "Current Page:",
@@ -82,7 +95,7 @@ function delay(msDelay) {
     "Data size:",
     urls.length,
     "Accum size:",
-    ulrsAccum.length
+    urlsAccum.length
   );
 
   // Crear una lista de páginas a dar click, desde 2 hasta N
@@ -93,7 +106,7 @@ function delay(msDelay) {
   }
 
   for (const pageIndex of pageIndexArray) {
-    await page.evaluate(pageIndex => {
+    await page.evaluate((pageIndex) => {
       const anchor = document.createElement("a");
       anchor.href =
         "javascript:__doPostBack('MasterGC$ContentBlockHolder$gvResultado','Page$" +
@@ -109,26 +122,26 @@ function delay(msDelay) {
     }, pageIndex);
 
     // click to the nextPage link AND we will wait until the next page loads
-    await Promise.all([ page.click(".next-link"), page.waitForNavigation() ]);
+    await Promise.all([page.click(".next-link"), page.waitForNavigation()]);
 
-    const urls = await page.evaluate(function() {
+    const urls = await page.evaluate(function () {
       let listOfUrls = [
         ...document.querySelectorAll(
           "#MasterGC_ContentBlockHolder_gvResultado > tbody .FilaTablaDetalle td:nth-child(2) a"
         ),
       ];
 
-      let listOfHrefs = listOfUrls.map(function(anchor) {
+      let listOfHrefs = listOfUrls.map(function (anchor) {
         return anchor.href;
       });
 
       return listOfHrefs;
     });
 
-    const repeatedInPage = ulrsAccum.filter(function(val) {
+    const repeatedInPage = urlsAccum.filter(function (val) {
       return urls.indexOf(val) != -1;
     });
-    ulrsAccum = [ ...ulrsAccum, ...urls ];
+    urlsAccum = [...urlsAccum, ...urls];
 
     console.log(
       "Current Page:",
@@ -136,30 +149,37 @@ function delay(msDelay) {
       "Data size:",
       urls.length,
       "Accum size:",
-      ulrsAccum.length,
+      urlsAccum.length,
       "Repeated",
       repeatedInPage.length
     );
   }
 
-  const uniques = [ ...new Set(ulrsAccum) ];
+  const uniques = [...new Set(urlsAccum)];
   await escrituraLectura.escribirArchivoSinEvitarRepetidos(
     year + "-links.json",
     uniques
   );
 
-  await escrituraLectura.escribirArchivoSinEvitarRepetidos(
-    year + "-links-all.json",
-    ulrsAccum
-  );
-
   console.log("-- Saved:", uniques.length, "on ", year + "-links.json");
-  console.log(
-    "-- Saved all:",
-    ulrsAccum.length,
-    "on ",
-    year + "-links-all.json"
-  );
 
   await browser.close();
 })();
+
+async function arreglaCagada(page, pageIndex) {
+  await page.evaluate((pageIndex) => {
+    const anchor = document.createElement("a");
+    anchor.href =
+      "javascript:__doPostBack('MasterGC$ContentBlockHolder$gvResultado','Page$" +
+      pageIndex +
+      "')";
+    anchor.classList.add("next-link");
+    anchor.innerText = "Diego ama el café turco";
+    document
+      .querySelector(
+        "#aspnetForm > div.container-fluid > div:nth-child(8) > span"
+      )
+      .append(anchor);
+  }, pageIndex);
+  await Promise.all([page.click(".next-link"), page.waitForNavigation()]);
+}
